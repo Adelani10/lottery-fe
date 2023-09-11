@@ -14,20 +14,19 @@ export default function Real() {
     const {chainId: chainIdHex, isWeb3Enabled} = useMoralis()
     const chainId = parseInt(chainIdHex)
     const contractAddress = chainId in contractAddresses ? contractAddresses[chainId][0] : null
-    const [entranceFee, setEntranceFee] = useState("")
-    const [numberOfPlayers, setNumberOfPlayers] = useState("")
-    const [recentWinner, setRecentWinner] = useState("")
+    const [entranceFee, setEntranceFee] = useState("0")
+    const [numberOfPlayers, setNumberOfPlayers] = useState("0")
+    const [recentWinner, setRecentWinner] = useState("0")
     const dispatch = useNotification()
 
-    // console.log(contractAddress)
-
-    // const {runContractFunction: enterLottery , isFetching, isLoading } =
-    // useWeb3Contract({
-    //   abi: abi,
-    //   contractAddress: contractAddress,
-    //   functionName: "enterLottery",
-    //   params: {},
-    // });
+    const {runContractFunction: enterLottery , isFetching, isLoading } =
+    useWeb3Contract({
+      abi: abi,
+      contractAddress: contractAddress,
+      functionName: "enterLottery",
+      params: {},
+      msgValue: entranceFee
+    });
 
     const {runContractFunction: getEntranceFee } =
     useWeb3Contract({
@@ -44,40 +43,47 @@ export default function Real() {
       functionName: "getNumberOfPlayers",
       params: {},
     });
-
+    
     const {runContractFunction: getRecentWinner } =
     useWeb3Contract({
-      abi: abi,
-      contractAddress: contractAddress,
-      functionName: "getRecentWinner",
-      params: {},
+        abi: abi,
+        contractAddress: contractAddress,
+        functionName: "getRecentWinner",
+        params: {},
     });
-
-    async function handleNotification() {
-        dispatch({
-            type: info,
-            message: "Tx Complete",
-            title: "Tx Notification",
-            position: "topR",
-            icon: Bell
-        })
-    }
-
     
-
-
     useEffect(() => {
         if(isWeb3Enabled) {
             updateUIValues()
         }
     },[isWeb3Enabled])
 
+    async function handleNotification() {
+        dispatch({
+            type: "info",
+            message: "Tx Complete",
+            title: "Tx Notification",
+            position: "topR",
+            icon: "bell"
+        })
+    }
+
+    const handleSuccess = async (tx) => {
+        try{
+            await tx.wait(1)
+            updateUIValues()
+            handleNotification(tx)
+        }
+        catch(error) {
+            console.log(error)
+        }
+    }
+
+
     async function updateUIValues() {
         const entranceFeeFromCall = (await getEntranceFee()).toString()
         const numberOfPlayersFromCall = (await getNumberOfPlayers()).toString()
-        const recentWinnerFromCall = (await getRecentWinner()).toString()
-        console.log(numberOfPlayersFromCall)
-        console.log(entranceFeeFromCall)
+        const recentWinnerFromCall = await getRecentWinner()
         setEntranceFee(entranceFeeFromCall)
         setNumberOfPlayers(numberOfPlayersFromCall)
         setRecentWinner(recentWinnerFromCall)
@@ -90,12 +96,19 @@ export default function Real() {
             <div className=" flex justify-start flex-col">
                 Contract address: 
                 <h1 className="font-bold text-xl">{contractAddress}</h1>
-                <div className="flex flex-col">
-                    <h2>Entrance Fee: {ethers.formatEther(entranceFee)}</h2>
-                    <button onClick={
-                        console.log("Okay")
-                    } className="bg-teal-700 p-2">
-                        Enter Lottery
+                <div className="flex flex-col items-start">
+                    <h2>Entrance Fee: {ethers.utils.formatEther(entranceFee)}</h2>
+                    <button onClick={async () => await enterLottery({
+                        onSuccess: handleSuccess,
+                        onError: (error)=> console.log(error)
+                        // onComplete:
+                    })}
+                    disabled={isFetching || isLoading}
+                     className="bg-teal-700 rounded-sm p-2">
+                        {
+                            isFetching || isLoading ? 
+                            <div className="animate-spin spinner-border border-b-2 rounded-full w-5 h-5 "></div> : <div>Enter Lottery</div>
+                        }
                     </button>
                     <h2>Total number of players: {numberOfPlayers}</h2>
                     <h2>The most previous winner is {recentWinner}</h2>
